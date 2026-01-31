@@ -1,0 +1,17 @@
+{
+    "Comment": "Create www alias record manually",
+    "Changes": [
+        {
+            "Action": "UPSERT",
+            "ResourceRecordSet": {
+                "Name": "www.crystolia.com",
+                "Type": "A",
+                "AliasTarget": {
+                    "HostedZoneId": "Z35SXDOTRQ7X7K",
+                    "DNSName": "a7cee3e3e055742929f54010b96c165e-2042701401.us-east-1.elb.amazonaws.com",
+                    "EvaluateTargetHealth": true
+                }
+            }
+        }
+    ]
+}

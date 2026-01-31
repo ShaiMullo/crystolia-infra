@@ -14,6 +14,18 @@ resource "aws_route53_record" "root" {
   }
 }
 
+resource "aws_route53_record" "www" {
+  zone_id = aws_route53_zone.main_zone.zone_id
+  name    = "www.crystolia.com"
+  type    = "A"
+
+  alias {
+    name                   = "a7cee3e3e055742929f54010b96c165e-2042701401.us-east-1.elb.amazonaws.com"
+    zone_id                = "Z35SXDOTRQ7X7K"
+    evaluate_target_health = true
+  }
+}
+
 resource "aws_route53_record" "facebook_verification" {
   zone_id         = aws_route53_zone.main_zone.zone_id
   name            = "crystolia.com"
