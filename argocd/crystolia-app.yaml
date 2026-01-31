@@ -10,7 +10,7 @@ spec:
   source:
     repoURL: https://github.com/ShaiMullo/crystolia-app.git
     targetRevision: main
-    path: charts/crystolia
+    path: helm/crystolia-chart
   destination:
     server: https://kubernetes.default.svc
     namespace: default
