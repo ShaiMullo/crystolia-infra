@@ -1,0 +1,28 @@
+{
+    "Changes": [
+        {
+            "Action": "DELETE",
+            "ResourceRecordSet": {
+                "Name": "crystolia.com.",
+                "Type": "A",
+                "AliasTarget": {
+                    "HostedZoneId": "Z35SXDOTRQ7X7K",
+                    "DNSName": "aad0abd729b1e4e8cb54ad0d3db1f80e-1427560734.us-east-1.elb.amazonaws.com.",
+                    "EvaluateTargetHealth": true
+                }
+            }
+        },
+        {
+            "Action": "DELETE",
+            "ResourceRecordSet": {
+                "Name": "www.crystolia.com.",
+                "Type": "A",
+                "AliasTarget": {
+                    "HostedZoneId": "Z35SXDOTRQ7X7K",
+                    "DNSName": "aad0abd729b1e4e8cb54ad0d3db1f80e-1427560734.us-east-1.elb.amazonaws.com.",
+                    "EvaluateTargetHealth": true
+                }
+            }
+        }
+    ]
+}

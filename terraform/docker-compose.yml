@@ -1,0 +1,70 @@
+# ===========================================
+# Crystolia DevOps Platform
+# Docker Compose - Development Environment
+# ===========================================
+# 
+# Usage:
+#   docker-compose up -d     # Start all services
+#   docker-compose down      # Stop all services
+#   docker-compose logs -f   # View logs
+#
+# Services:
+#   - frontend: Next.js application (port 3000)
+#   - db: PostgreSQL database (port 5432)
+
+services:
+  # -----------------------------------------
+  # Frontend Service - Next.js Application
+  # -----------------------------------------
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    container_name: crystolia-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://crystolia:crystolia123@db:5432/crystolia
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - crystolia-network
+    restart: unless-stopped
+
+  # -----------------------------------------
+  # Database Service - PostgreSQL
+  # -----------------------------------------
+  db:
+    image: postgres:16-alpine
+    container_name: crystolia-db
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: crystolia
+      POSTGRES_PASSWORD: crystolia123
+      POSTGRES_DB: crystolia
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U crystolia"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - crystolia-network
+    restart: unless-stopped
+
+# -----------------------------------------
+# Networks
+# -----------------------------------------
+networks:
+  crystolia-network:
+    driver: bridge
+
+# -----------------------------------------
+# Volumes
+# -----------------------------------------
+volumes:
+  postgres_data:
