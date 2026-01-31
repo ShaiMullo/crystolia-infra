@@ -9,7 +9,7 @@ resource "aws_route53_record" "root" {
 
   alias {
     name                   = "a7cee3e3e055742929f54010b96c165e-2042701401.us-east-1.elb.amazonaws.com"
-    zone_id                = "Z26RNL4JYFTOTI" # ELB Zone ID for us-east-1
+    zone_id                = "Z35SXDOTRQ7X7K" # Classic ELB Zone ID for us-east-1
     evaluate_target_health = true
   }
 }
