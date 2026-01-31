@@ -4,7 +4,7 @@ variable "cluster_name" {}
 
 # Secrets placeholder
 resource "aws_secretsmanager_secret" "backend_secrets" {
-  name = "${var.environment}-backend-secrets"
+  name        = "${var.environment}-backend-secrets"
   description = "Secrets for Crystolia Backend (Green Invoice, DB, Payment)"
 }
 

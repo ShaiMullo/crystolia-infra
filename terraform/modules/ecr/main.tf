@@ -1,11 +1,11 @@
 variable "repositories" {
-  type = list(string)
+  type    = list(string)
   default = ["crystolia-backend", "crystolia-frontend"]
 }
 
 resource "aws_ecr_repository" "repos" {
-  count = length(var.repositories)
-  name  = var.repositories[count.index]
+  count                = length(var.repositories)
+  name                 = var.repositories[count.index]
   image_tag_mutability = "MUTABLE"
 
   image_scanning_configuration {
@@ -22,9 +22,9 @@ resource "aws_ecr_lifecycle_policy" "repos_policy" {
       rulePriority = 1
       description  = "Keep last 30 images"
       selection = {
-        tagStatus     = "any"
-        countType     = "imageCountMoreThan"
-        countNumber   = 30
+        tagStatus   = "any"
+        countType   = "imageCountMoreThan"
+        countNumber = 30
       }
       action = {
         type = "expire"

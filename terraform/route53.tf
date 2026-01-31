@@ -15,11 +15,11 @@ resource "aws_route53_record" "root" {
 }
 
 resource "aws_route53_record" "facebook_verification" {
-  zone_id = aws_route53_zone.main_zone.zone_id
-  name    = "crystolia.com"
-  type    = "TXT"
-  ttl     = 300
-  records = ["facebook-domain-verification=theo5f8cqs6nmsp7h0vexg13vqz47d"]
+  zone_id         = aws_route53_zone.main_zone.zone_id
+  name            = "crystolia.com"
+  type            = "TXT"
+  ttl             = 300
+  records         = ["facebook-domain-verification=theo5f8cqs6nmsp7h0vexg13vqz47d"]
   allow_overwrite = true
 }
 
