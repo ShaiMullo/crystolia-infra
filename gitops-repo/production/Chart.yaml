@@ -1,7 +1,0 @@
-apiVersion: v2
-name: crystolia-prod
-version: 1.0.0
-dependencies:
-  - name: crystolia-chart
-    version: 0.1.0
-    repository: "file://../../crystolia-app/helm/crystolia-chart" # Placeholder
