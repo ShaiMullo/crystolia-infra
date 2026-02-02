@@ -4,8 +4,9 @@ variable "cluster_name" {}
 
 # Secrets placeholder
 resource "aws_secretsmanager_secret" "backend_secrets" {
-  name        = "${var.environment}-backend-secrets"
-  description = "Secrets for Crystolia Backend (Green Invoice, DB, Payment)"
+  name                    = "prod-backend-secrets-v2"
+  description             = "Secrets for Crystolia Backend (Green Invoice, DB, Payment)"
+  recovery_window_in_days = 0 # Force delete immediately next time
 }
 
 # IAM Role for Backend Service Account (IRSA)
