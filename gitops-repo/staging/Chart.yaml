@@ -1,0 +1,26 @@
+apiVersion:,v2
+name: crystolia-staging
+version: 1.0.0
+dependencies:
+  - name: crystolia-chart
+    version: 0.1.0
+    repository: https://shaimullo.github.io/crystolia-app/ # This assumes we publish the chart, OR we use git path
+    # For a project without a hosted Helm repo, pointing to the git source via ArgoCD is easier.
+    # But since we are creating a WRAPPER chart, we usually need a repo.
+    # ALTERNATIVE: Use local path if in same repo, but this is a separate repo.
+    # User Requirement: "crystolia-gitops must be treated as a real third repo"
+    
+    # STRATEGY CHANGE:
+    # Instead of a wrapper chart (which requires a Helm Repo), 
+    # the GitOps repo usually contains just values.yaml if it points to the main chart in the app repo.
+    # BUT the user specific "Chart.yaml (Dependency)".
+    # This implies we need a Helm Repository.
+    # FOR NOW: I will set the repository to a placeholder or assume the App Repo serves it via gh-pages.
+    # OR, we simply use the "values only" approach in ArgoCD application, pointing to the MAIN chart but using values from GITOPS repo.
+    # Wait, ArgoCD supports "Multiple Sources" since v2.6.
+    
+    # Let's stick to the User Request: "Chart.yaml (Dependency)".
+    # I will assume we will use `helm package` in CI and push to `gh-pages` or OCI.
+    # For now, I will write the file assuming OCI or HTTP repo.
+    repository: "https://raw.githubusercontent.com/ShaiMullo/crystolia-app/deploy/production/helm" 
+    # This is tricky without a real repo.

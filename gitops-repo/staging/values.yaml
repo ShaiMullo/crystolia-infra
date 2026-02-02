@@ -1,0 +1,24 @@
+global:
+  environment: "staging"
+
+frontend:
+  replicaCount: 1
+  image:
+    tag: "latest" # To be updated by CI
+  resources:
+    limits:
+      cpu: "100m"
+      memory: "128Mi"
+  env:
+    NEXT_PUBLIC_API_URL: "https://staging.crystolia.com/api"
+
+backend:
+  replicaCount: 1
+  image:
+    tag: "latest" # To be updated by CI
+  env:
+    FRONTEND_URL: "https://staging.crystolia.com"
+
+ingress:
+  host: staging.crystolia.com
+  hostWWW: www.staging.crystolia.com

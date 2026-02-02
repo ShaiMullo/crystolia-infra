@@ -12,6 +12,14 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 5.0"
     }
+    helm = {
+      source  = "hashicorp/helm"
+      version = "~> 2.12"
+    }
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = "~> 2.24"
+    }
   }
 }
 
@@ -61,6 +69,34 @@ module "acm" {
 
 output "vpc_id" { value = module.vpc.vpc_id }
 output "nat_ip" { value = module.vpc.nat_public_ip } # Whitelist this in MongoDB Atlas
+# 6. Add-ons (ArgoCD, Monitoring, etc.)
+module "addons" {
+  source = "./modules/addons"
+  depends_on = [module.eks]
+}
+
+data "aws_eks_cluster" "cluster" {
+  name = module.eks.cluster_name
+}
+
+data "aws_eks_cluster_auth" "cluster" {
+  name = module.eks.cluster_name
+}
+
+provider "kubernetes" {
+  host                   = data.aws_eks_cluster.cluster.endpoint
+  cluster_ca_certificate = base64decode(data.aws_eks_cluster.cluster.certificate_authority.0.data)
+  token                  = data.aws_eks_cluster_auth.cluster.token
+}
+
+provider "helm" {
+  kubernetes {
+    host                   = data.aws_eks_cluster.cluster.endpoint
+    cluster_ca_certificate = base64decode(data.aws_eks_cluster.cluster.certificate_authority.0.data)
+    token                  = data.aws_eks_cluster_auth.cluster.token
+  }
+}
+
 output "eks_cluster_endpoint" { value = module.eks.cluster_endpoint }
 output "backend_role_arn" { value = module.security.backend_role_arn }
 output "ecr_repos" { value = module.ecr.repository_urls }

@@ -1,0 +1,24 @@
+global:
+  environment: "production"
+
+frontend:
+  replicaCount: 2
+  image:
+    tag: "latest" # To be updated by CI
+  resources:
+    limits:
+      cpu: "250m"
+      memory: "256Mi"
+  env:
+    NEXT_PUBLIC_API_URL: "https://crystolia.com/api"
+
+backend:
+  replicaCount: 2
+  image:
+    tag: "latest" # To be updated by CI
+  env:
+    FRONTEND_URL: "https://crystolia.com"
+
+ingress:
+  host: crystolia.com
+  hostWWW: www.crystolia.com
