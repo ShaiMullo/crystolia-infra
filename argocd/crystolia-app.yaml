@@ -9,7 +9,7 @@ spec:
   project: default
   source:
     repoURL: https://github.com/ShaiMullo/crystolia-app.git
-    targetRevision: main
+    targetRevision: deploy/production
     path: helm/crystolia-chart
     helm:
       parameters:
