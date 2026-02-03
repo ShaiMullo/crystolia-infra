@@ -4,9 +4,16 @@ variable "cluster_name" {
 }
 
 variable "vpc_id" {
-  type = string
+  description = "VPC ID where the cluster and workers will be deployed"
+  type        = string
 }
 
 variable "subnet_ids" {
-  type = list(string)
+  description = "List of subnet IDs for the worker nodes (Private Subnets recommended)"
+  type        = list(string)
+}
+
+variable "environment" {
+  description = "Environment name"
+  type        = string
 }
