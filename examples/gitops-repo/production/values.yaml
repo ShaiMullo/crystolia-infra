@@ -1,0 +1,48 @@
+global:
+  environment: "production"
+
+frontend:
+  replicaCount: 2
+  image:
+    tag: "latest" # To be updated by CI
+  resources:
+    limits:
+      cpu: "250m"
+      memory: "256Mi"
+  env:
+    NEXT_PUBLIC_API_URL: "https://crystolia.com/api"
+
+backend:
+  replicaCount: 2
+  image:
+    tag: "latest" # To be updated by CI
+  env:
+    FRONTEND_URL: "https://crystolia.com"
+
+ingress:
+  enabled: true
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+  hosts:
+    - host: crystolia.com
+      paths:
+        - path: /
+          pathType: Prefix
+          service: frontend
+    - host: api.crystolia.com
+      paths:
+        - path: /
+          pathType: Prefix
+          service: backend
+
+# Override frontend env to point to the new API subdomain (HTTP for now)
+frontend:
+  env:
+    NEXT_PUBLIC_API_URL: "http://api.crystolia.com"
+
+backend:
+  replicaCount: 2
+  image:
+    tag: "latest"
+  env:
+    FRONTEND_URL: "http://crystolia.com"
