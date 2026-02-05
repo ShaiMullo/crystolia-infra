@@ -1,0 +1,27 @@
+# ArgoCD Application for demo-app
+# --------------------------------
+# This Application is picked up by root-app (App-of-Apps pattern)
+# and syncs the manifests/ directory to the cluster.
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: demo-app
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/ShaiMullo/crystolia-infra.git
+    targetRevision: main
+    path: argocd/apps/demo-app/manifests
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: demo
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
