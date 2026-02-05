@@ -1,0 +1,27 @@
+# ArgoCD Root Application - App-of-Apps Pattern
+# ----------------------------------------------
+# This is the ONLY root application that ArgoCD manages directly.
+# All other applications are defined in /argocd/apps/ and synced via this root.
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: root-app
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/ShaiMullo/crystolia-infra.git
+    targetRevision: main
+    path: argocd/apps
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
