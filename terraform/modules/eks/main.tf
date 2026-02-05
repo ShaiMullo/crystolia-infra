@@ -1,59 +1,70 @@
+# EKS Module - Cost Optimized with Spot Nodes
+# --------------------------------------------
+# Uses Spot instances for significant cost savings in demo/dev environments.
+
 module "eks" {
   source  = "terraform-aws-modules/eks/aws"
   version = "~> 20.0"
 
   cluster_name    = var.cluster_name
-  cluster_version = "1.29" # User Requested Stable Version
+  cluster_version = "1.29"
 
-  # API Access Policy
-  # -----------------
-  # For this Dev environment, we allow 0.0.0.0/0 (Public Access).
-  # In a strict Production setup, we would restrict this to specific CIDRs 
-  # (Office VPN, Bastion) using `cluster_endpoint_public_access_cidrs`.
+  # API Access - Public for demo (restrict in production)
   cluster_endpoint_public_access = true
 
   # VPC Configuration
   vpc_id     = var.vpc_id
   subnet_ids = var.subnet_ids
 
-  # OIDC Provider for IRSA
+  # OIDC Provider for future IRSA support
   enable_irsa = true
 
-  # Managed Node Groups
+  # Cost-Optimized Spot Node Group
   eks_managed_node_groups = {
-    # 1. System Node Group (Core Components like CoreDNS, VPC CNI, etc.)
-    system = {
-      name           = "system-nodes"
-      instance_types = ["t3.medium"] # Upsized from t3.small
-      min_size       = 1
-      max_size       = 2
-      desired_size   = 1
+    spot-nodes = {
+      name = "spot-nodes-${var.environment}"
 
+      # SPOT capacity for cost savings
+      capacity_type = "SPOT"
+
+      # Diverse instance types for Spot availability
+      instance_types = [
+        "t3a.small",
+        "t3.small",
+        "t2.small",
+        "t3a.medium",
+        "t3.medium",
+        "t2.medium"
+      ]
+
+      # Minimal scaling for demo
+      min_size     = 1
+      max_size     = 2
+      desired_size = 1
+
+      # Disk configuration
+      disk_size = 20
+
+      # Labels for workload identification
       labels = {
-        role = "system"
+        env      = "demo"
+        workload = "general"
       }
-    }
 
-    # 2. Application Node Group (User Workloads)
-    app = {
-      name           = "app-nodes"
-      instance_types = ["t3.medium"] # Slightly larger for apps
-      min_size       = 1
-      max_size       = 3
-      desired_size   = 1
-
-      labels = {
-        role = "app"
-      }
+      # Tags specific to node group
+      tags = merge(var.common_tags, {
+        NodeGroup = "spot-nodes"
+      })
     }
   }
 
   # Cluster Access
   enable_cluster_creator_admin_permissions = true
 
-  tags = {
+  # Cluster-level tags
+  tags = merge(var.common_tags, {
+    Name        = var.cluster_name
     Environment = var.environment
-    Project     = "Crystolia"
     ManagedBy   = "Terraform"
-  }
+  })
 }

@@ -5,5 +5,18 @@ variable "vpc_cidr" {
 }
 
 variable "environment" {
-  type = string
+  description = "Environment name"
+  type        = string
+}
+
+variable "project_name" {
+  description = "Project name for resource naming"
+  type        = string
+  default     = "crystolia"
+}
+
+variable "common_tags" {
+  description = "Common tags applied to all resources"
+  type        = map(string)
+  default     = {}
 }
