@@ -168,7 +168,8 @@ resource "aws_iam_policy" "terraform_state_access" {
         Sid    = "LogsReadOnly"
         Effect = "Allow"
         Action = [
-          "logs:DescribeLogGroups"
+          "logs:DescribeLogGroups",
+          "logs:ListTagsForResource"
         ]
         Resource = "*"
       },
