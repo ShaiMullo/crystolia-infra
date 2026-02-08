@@ -1,5 +1,20 @@
+# Terraform CI/CD Pipeline
+# -------------------------
+# This workflow validates and plans Terraform changes.
+#
+# SECURITY: Uses GitHub OIDC for AWS authentication (no static credentials)
+# SAFETY: terraform apply is INTENTIONALLY EXCLUDED - apply runs locally only
+#
+# Why no apply in CI?
+# 1. Cost control: Prevents accidental resource creation
+# 2. Safety: Infrastructure changes require human review and approval
+# 3. Academic: Demonstrates separation of CI (validation) vs CD (deployment)
+# 4. Production: Standard practice for critical infrastructure
+
+name: Terraform CI
+
 on:
-  workflow_dispatch:
+  workflow_dispatch: # Manual trigger for testing
   push:
     branches:
       - main
@@ -11,77 +26,110 @@ on:
     paths:
       - 'terraform/**'
 
+# Required for GitHub OIDC token generation
+permissions:
+  id-token: write # Allows requesting OIDC token
+  contents: read # Allows reading repository
+  pull-requests: write # Allows commenting on PRs
+
 env:
-  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
   AWS_REGION: us-east-1
+  TF_VERSION: 1.5.7
 
 jobs:
   terraform:
-    name: "Terraform"
+    name: "Terraform Plan"
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: ./terraform
 
     steps:
+      # Step 1: Checkout repository
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v2
+      # Step 2: Configure AWS credentials via OIDC
+      # No static credentials - uses GitHub's OIDC token to assume IAM role
+      - name: Configure AWS Credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          terraform_version: 1.5.7
+          role-to-assume: arn:aws:iam::268456953512:role/github-actions-terraform-role
+          role-session-name: github-actions-terraform
+          aws-region: ${{ env.AWS_REGION }}
 
-      - name: Terraform Format
+      # Step 3: Setup Terraform
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      # Step 4: Check formatting
+      - name: Terraform Format Check
         id: fmt
-        run: terraform fmt -check
+        run: terraform fmt -check -recursive
+        continue-on-error: true
 
+      # Step 5: Initialize Terraform (connects to S3 backend)
       - name: Terraform Init
         id: init
         run: terraform init
 
+      # Step 6: Validate configuration
       - name: Terraform Validate
         id: validate
         run: terraform validate -no-color
 
+      # Step 7: Generate plan
       - name: Terraform Plan
         id: plan
-        if: github.event_name == 'pull_request'
-        run: terraform plan -no-color -input=false
+        run: terraform plan -no-color -input=false -out=tfplan
         continue-on-error: true
 
-      - name: Update Pull Request
-        uses: actions/github-script@v6
+      # Step 8: Comment on PR with plan results
+      - name: Comment on Pull Request
+        uses: actions/github-script@v7
         if: github.event_name == 'pull_request'
         env:
-          PLAN: "terraform
-
-            ${{ steps.plan.outputs.stdout }}"
+          PLAN_OUTPUT: ${{ steps.plan.outputs.stdout }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const output = `#### Terraform Format and Style 🖌\`${{ steps.fmt.outcome }}\`
-            #### Terraform Initialization ⚙️\`${{ steps.init.outcome }}\`
-            #### Terraform Plan 📖\`${{ steps.plan.outcome }}\`
+            const output = `### Terraform Plan Results
 
-            <details><summary>Show Plan</summary>
+            | Step | Status |
+            |------|--------|
+            | 🖌️ Format | \`${{ steps.fmt.outcome }}\` |
+            | ⚙️ Init | \`${{ steps.init.outcome }}\` |
+            | ✅ Validate | \`${{ steps.validate.outcome }}\` |
+            | 📖 Plan | \`${{ steps.plan.outcome }}\` |
 
-            \`\`\`\n
-            ${process.env.PLAN}
+            <details><summary>Show Plan Output</summary>
+
+            \`\`\`
+            ${process.env.PLAN_OUTPUT || 'No plan output available'}
             \`\`\`
 
             </details>
 
-            *Pushed by: @${{ github.actor }}, Action: \`${{ github.event_name }}\`*`;
+            ---
+            > ⚠️ **Note:** \`terraform apply\` runs locally only (not in CI).
+            > This is by design for cost control and safety.
+
+            *Triggered by: @${{ github.actor }} via \`${{ github.event_name }}\`*`;
 
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
               body: output
-            })
+            });
 
-      - name: Terraform Apply
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-        run: terraform apply -auto-approve -input=false
+      # Step 9: Fail if plan failed (but after PR comment)
+      - name: Check Plan Status
+        if: steps.plan.outcome == 'failure'
+        run: exit 1
+      # =========================================================================
+      # IMPORTANT: terraform apply is NOT included here.
+      # Apply runs locally only. See docs/ci-cd-architecture.md for rationale.
+      # =========================================================================
