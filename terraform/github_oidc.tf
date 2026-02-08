@@ -198,6 +198,90 @@ resource "aws_iam_role_policy_attachment" "github_actions_terraform" {
   policy_arn = aws_iam_policy.terraform_state_access.arn
 }
 
+# =============================================================================
+# IAM Role for crystolia-app CI (ECR Push)
+# =============================================================================
+# This role is used by the crystolia-app repository to build and push
+# Docker images to ECR during CI/CD.
+
+resource "aws_iam_role" "github_actions_ecr" {
+  name        = "github-actions-ecr-push-role"
+  description = "IAM role for GitHub Actions to push images to ECR"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Federated = aws_iam_openid_connect_provider.github.arn
+        }
+        Action = "sts:AssumeRoleWithWebIdentity"
+        Condition = {
+          StringEquals = {
+            "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
+          }
+          StringLike = {
+            # Allow crystolia-app repo (any branch for builds)
+            "token.actions.githubusercontent.com:sub" = "repo:ShaiMullo/crystolia-app:*"
+          }
+        }
+      }
+    ]
+  })
+
+  tags = merge(var.common_tags, {
+    Name       = "github-actions-ecr-push-role"
+    Purpose    = "ECR-push-for-CI"
+    Repository = "crystolia-app"
+  })
+}
+
+resource "aws_iam_policy" "ecr_push" {
+  name        = "ecr-push-policy"
+  description = "Allow pushing images to ECR repositories"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "ECRLogin"
+        Effect = "Allow"
+        Action = [
+          "ecr:GetAuthorizationToken"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "ECRPush"
+        Effect = "Allow"
+        Action = [
+          "ecr:BatchCheckLayerAvailability",
+          "ecr:GetDownloadUrlForLayer",
+          "ecr:BatchGetImage",
+          "ecr:InitiateLayerUpload",
+          "ecr:UploadLayerPart",
+          "ecr:CompleteLayerUpload",
+          "ecr:PutImage"
+        ]
+        Resource = [
+          aws_ecr_repository.backend.arn,
+          aws_ecr_repository.frontend.arn
+        ]
+      }
+    ]
+  })
+
+  tags = merge(var.common_tags, {
+    Name = "ecr-push-policy"
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "github_actions_ecr" {
+  role       = aws_iam_role.github_actions_ecr.name
+  policy_arn = aws_iam_policy.ecr_push.arn
+}
+
 # -----------------------------------------------------------------------------
 # Outputs
 # -----------------------------------------------------------------------------
@@ -210,4 +294,9 @@ output "github_actions_role_arn" {
 output "github_oidc_provider_arn" {
   description = "ARN of the GitHub OIDC provider"
   value       = aws_iam_openid_connect_provider.github.arn
+}
+
+output "github_actions_ecr_role_arn" {
+  description = "ARN of the IAM role for ECR push (crystolia-app)"
+  value       = aws_iam_role.github_actions_ecr.arn
 }
