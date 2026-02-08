@@ -40,7 +40,7 @@ module "eks" {
       # Minimal scaling for demo
       min_size     = 1
       max_size     = 2
-      desired_size = 1
+      desired_size = 2
 
       # Disk configuration
       disk_size = 20
