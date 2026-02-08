@@ -81,16 +81,22 @@ resource "aws_iam_role" "github_actions_terraform" {
 }
 
 # -----------------------------------------------------------------------------
-# IAM Policy — Terraform State Access ONLY
+# IAM Policy — Terraform State + Read-Only for Plan
 # -----------------------------------------------------------------------------
+# terraform plan requires read access to refresh state against live resources.
+# This policy grants:
+# - State bucket access (S3 + DynamoDB) 
+# - Read-only access to resources managed by this Terraform configuration
+# - NO write/create/delete permissions for AWS infrastructure
 
 resource "aws_iam_policy" "terraform_state_access" {
-  name        = "terraform-state-access-policy"
-  description = "Access to Terraform S3 state bucket and DynamoDB lock table only"
+  name        = "terraform-ci-policy"
+  description = "Terraform CI: state access + read-only for plan"
 
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
+      # --- Terraform State Backend ---
       {
         Sid    = "S3StateAccess"
         Effect = "Allow"
@@ -115,12 +121,70 @@ resource "aws_iam_policy" "terraform_state_access" {
           "dynamodb:DescribeTable"
         ]
         Resource = "arn:aws:dynamodb:us-east-1:${data.aws_caller_identity.current.account_id}:table/crystolia-tf-locks"
+      },
+      # --- Read-Only for terraform plan ---
+      {
+        Sid    = "EC2ReadOnly"
+        Effect = "Allow"
+        Action = [
+          "ec2:Describe*"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "EKSReadOnly"
+        Effect = "Allow"
+        Action = [
+          "eks:Describe*",
+          "eks:List*"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "IAMReadOnly"
+        Effect = "Allow"
+        Action = [
+          "iam:GetRole",
+          "iam:GetPolicy",
+          "iam:GetPolicyVersion",
+          "iam:ListRolePolicies",
+          "iam:ListAttachedRolePolicies",
+          "iam:GetOpenIDConnectProvider",
+          "iam:ListOpenIDConnectProviders"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "KMSReadOnly"
+        Effect = "Allow"
+        Action = [
+          "kms:DescribeKey",
+          "kms:GetKeyPolicy",
+          "kms:ListAliases"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "LogsReadOnly"
+        Effect = "Allow"
+        Action = [
+          "logs:DescribeLogGroups"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "STSGetCallerIdentity"
+        Effect = "Allow"
+        Action = [
+          "sts:GetCallerIdentity"
+        ]
+        Resource = "*"
       }
     ]
   })
 
   tags = merge(var.common_tags, {
-    Name = "terraform-state-access-policy"
+    Name = "terraform-ci-policy"
   })
 }
 
