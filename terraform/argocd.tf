@@ -14,62 +14,63 @@ resource "helm_release" "argocd" {
   wait    = true
   timeout = 600
 
-  # Server configuration
-  set {
-    name  = "server.service.type"
-    value = "ClusterIP"
-  }
+  # ---- ArgoCD server configuration ----
+  values = [
+    yamlencode({
+      # Global configs including server params
+      configs = {
+        params = {
+          # Run server in insecure mode (no TLS) - required for HTTP ingress
+          "server.insecure" = true
+        }
+      }
 
-  # Disable TLS on server (handled by ingress)
-  set {
-    name  = "server.insecure"
-    value = "true"
-  }
+      server = {
+        service = {
+          type = "ClusterIP"
+        }
 
-  # Resource limits for server
-  set {
-    name  = "server.resources.requests.cpu"
-    value = "100m"
-  }
+        # Extra args for proper HTTP handling
+        extraArgs = [
+          "--insecure"
+        ]
 
-  set {
-    name  = "server.resources.requests.memory"
-    value = "128Mi"
-  }
+        resources = {
+          requests = {
+            cpu    = "100m"
+            memory = "128Mi"
+          }
+          limits = {
+            cpu    = "200m"
+            memory = "256Mi"
+          }
+        }
+      }
 
-  set {
-    name  = "server.resources.limits.cpu"
-    value = "200m"
-  }
+      repoServer = {
+        resources = {
+          requests = {
+            cpu    = "100m"
+            memory = "128Mi"
+          }
+        }
+      }
 
-  set {
-    name  = "server.resources.limits.memory"
-    value = "256Mi"
-  }
+      controller = {
+        resources = {
+          requests = {
+            cpu    = "100m"
+            memory = "128Mi"
+          }
+        }
+      }
+    })
+  ]
 
-  # Repo server resources
-  set {
-    name  = "repoServer.resources.requests.cpu"
-    value = "100m"
-  }
-
-  set {
-    name  = "repoServer.resources.requests.memory"
-    value = "128Mi"
-  }
-
-  # Controller resources
-  set {
-    name  = "controller.resources.requests.cpu"
-    value = "100m"
-  }
-
-  set {
-    name  = "controller.resources.requests.memory"
-    value = "128Mi"
-  }
-
-  depends_on = [module.eks, helm_release.ingress_nginx]
+  depends_on = [
+    module.eks,
+    helm_release.ingress_nginx
+  ]
 }
 
 # -----------------------------------------------------------------------------
@@ -80,10 +81,12 @@ resource "kubernetes_ingress_v1" "argocd" {
   metadata {
     name      = "argocd-server-ingress"
     namespace = "argocd"
+
     annotations = {
       "kubernetes.io/ingress.class"                    = "nginx"
-      "nginx.ingress.kubernetes.io/force-ssl-redirect" = "false"
       "nginx.ingress.kubernetes.io/backend-protocol"   = "HTTP"
+      "nginx.ingress.kubernetes.io/force-ssl-redirect" = "false"
+      "nginx.ingress.kubernetes.io/ssl-redirect"       = "false"
     }
   }
 
@@ -95,6 +98,7 @@ resource "kubernetes_ingress_v1" "argocd" {
         path {
           path      = "/"
           path_type = "Prefix"
+
           backend {
             service {
               name = "argocd-server"
@@ -134,3 +138,4 @@ data "kubernetes_service" "ingress_nginx" {
 
   depends_on = [helm_release.ingress_nginx]
 }
+

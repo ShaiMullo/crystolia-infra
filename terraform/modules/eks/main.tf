@@ -19,27 +19,23 @@ module "eks" {
   # OIDC Provider for future IRSA support
   enable_irsa = true
 
-  # Cost-Optimized Spot Node Group
+  # Stable Node Group for Bootstrap Phase
   eks_managed_node_groups = {
-    spot-nodes = {
-      name = "spot-nodes-${var.environment}"
+    general = {
+      name = "general-${var.environment}"
 
-      # SPOT capacity for cost savings
-      capacity_type = "SPOT"
+      # ON_DEMAND for stability during bootstrap
+      capacity_type = "ON_DEMAND"
 
-      # Diverse instance types for Spot availability
+      # Medium instances only (17 pods capacity vs 11 for small)
       instance_types = [
-        "t3a.small",
-        "t3.small",
-        "t2.small",
-        "t3a.medium",
         "t3.medium",
-        "t2.medium"
+        "t3a.medium"
       ]
 
-      # Minimal scaling for demo
-      min_size     = 1
-      max_size     = 2
+      # Scaling for workloads
+      min_size     = 2
+      max_size     = 3
       desired_size = 2
 
       # Disk configuration
@@ -53,7 +49,7 @@ module "eks" {
 
       # Tags specific to node group
       tags = merge(var.common_tags, {
-        NodeGroup = "spot-nodes"
+        NodeGroup = "general"
       })
     }
   }
