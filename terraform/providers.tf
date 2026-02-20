@@ -15,7 +15,7 @@ provider "aws" {
 # -----------------------------------------------------------------------------
 # EKS Cluster Data Sources
 # -----------------------------------------------------------------------------
-# Required for Kubernetes and Helm providers to connect to the cluster.
+# REQUIRED: Authenticate via AWS API, not kubeconfig.
 
 data "aws_eks_cluster" "cluster" {
   name = module.eks.cluster_name

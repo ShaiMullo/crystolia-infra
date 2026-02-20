@@ -1,8 +1,3 @@
-# ArgoCD Installation via Helm
-# ----------------------------
-# GitOps controller for application deployments.
-# Exposed via ingress-nginx for external access.
-
 resource "helm_release" "argocd" {
   name             = "argocd"
   repository       = "https://argoproj.github.io/argo-helm"
@@ -11,17 +6,15 @@ resource "helm_release" "argocd" {
   namespace        = "argocd"
   create_namespace = true
 
-  wait    = true
-  timeout = 600
+  wait         = true
+  timeout      = 600
+  force_update = true
 
-  # ---- ArgoCD server configuration ----
   values = [
     yamlencode({
-      # Global configs including server params
       configs = {
         params = {
-          # Run server in insecure mode (no TLS) - required for HTTP ingress
-          "server.insecure" = true
+          # "server.insecure" removed to rely on extraArgs
         }
       }
 
@@ -30,39 +23,18 @@ resource "helm_release" "argocd" {
           type = "ClusterIP"
         }
 
-        # Extra args for proper HTTP handling
-        extraArgs = [
-          "--insecure"
-        ]
-
-        resources = {
-          requests = {
-            cpu    = "100m"
-            memory = "128Mi"
-          }
-          limits = {
-            cpu    = "200m"
-            memory = "256Mi"
-          }
+        ingress = {
+          enabled = false
         }
-      }
 
-      repoServer = {
-        resources = {
-          requests = {
-            cpu    = "100m"
-            memory = "128Mi"
-          }
-        }
+        extraArgs = ["--insecure"]
       }
 
       controller = {
-        resources = {
-          requests = {
-            cpu    = "100m"
-            memory = "128Mi"
-          }
-        }
+        resources = { requests = { cpu = "100m", memory = "128Mi" } }
+      }
+      repoServer = {
+        resources = { requests = { cpu = "100m", memory = "128Mi" } }
       }
     })
   ]
@@ -73,10 +45,6 @@ resource "helm_release" "argocd" {
   ]
 }
 
-# -----------------------------------------------------------------------------
-# Ingress for ArgoCD Server
-# -----------------------------------------------------------------------------
-
 resource "kubernetes_ingress_v1" "argocd" {
   metadata {
     name      = "argocd-server-ingress"
@@ -85,8 +53,8 @@ resource "kubernetes_ingress_v1" "argocd" {
     annotations = {
       "kubernetes.io/ingress.class"                    = "nginx"
       "nginx.ingress.kubernetes.io/backend-protocol"   = "HTTP"
-      "nginx.ingress.kubernetes.io/force-ssl-redirect" = "false"
       "nginx.ingress.kubernetes.io/ssl-redirect"       = "false"
+      "nginx.ingress.kubernetes.io/force-ssl-redirect" = "false"
     }
   }
 
@@ -94,6 +62,8 @@ resource "kubernetes_ingress_v1" "argocd" {
     ingress_class_name = "nginx"
 
     rule {
+      host = "argocd.crystolia.com"
+
       http {
         path {
           path      = "/"
@@ -112,30 +82,12 @@ resource "kubernetes_ingress_v1" "argocd" {
     }
   }
 
-  depends_on = [helm_release.argocd]
-}
-
-# -----------------------------------------------------------------------------
-# Outputs
-# -----------------------------------------------------------------------------
-
-output "argocd_url" {
-  description = "ArgoCD external URL (via ingress-nginx NLB)"
-  value       = "http://${data.kubernetes_service.ingress_nginx.status[0].load_balancer[0].ingress[0].hostname}"
+  depends_on = [
+    module.eks,
+    helm_release.argocd
+  ]
 }
 
 output "argocd_admin_password_command" {
-  description = "Command to get ArgoCD admin password"
-  value       = "kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d"
+  value = "kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d"
 }
-
-# Data source to get ingress-nginx LoadBalancer hostname
-data "kubernetes_service" "ingress_nginx" {
-  metadata {
-    name      = "ingress-nginx-controller"
-    namespace = "ingress-nginx"
-  }
-
-  depends_on = [helm_release.ingress_nginx]
-}
-

@@ -36,6 +36,21 @@ resource "helm_release" "ingress_nginx" {
     value = "true"
   }
 
+  set {
+    name  = "controller.service.annotations.service\\.beta\\.kubernetes\\.io/aws-load-balancer-ssl-cert"
+    value = module.acm.acm_certificate_arn
+  }
+
+  set {
+    name  = "controller.service.annotations.service\\.beta\\.kubernetes\\.io/aws-load-balancer-ssl-ports"
+    value = "443"
+  }
+
+  set {
+    name  = "controller.service.annotations.service\\.beta\\.kubernetes\\.io/aws-load-balancer-backend-protocol"
+    value = "http"
+  }
+
   # Resource limits
   set {
     name  = "controller.resources.requests.cpu"
@@ -56,6 +71,19 @@ resource "helm_release" "ingress_nginx" {
     name  = "controller.resources.limits.memory"
     value = "256Mi"
   }
+
+  values = [
+    yamlencode({
+      controller = {
+        service = {
+          targetPorts = {
+            http  = "http"
+            https = "http"
+          }
+        }
+      }
+    })
+  ]
 
   # Admission webhook (required for ingress validation)
   set {

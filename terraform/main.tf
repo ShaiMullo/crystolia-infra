@@ -41,6 +41,33 @@ module "eks" {
 }
 
 # -----------------------------------------------------------------------------
+# ACM Module - Wildcard Certificate
+# -----------------------------------------------------------------------------
+module "acm" {
+  source = "./modules/acm"
+
+  environment = var.environment
+  common_tags = var.common_tags
+}
+
+# -----------------------------------------------------------------------------
+# EKS Node Security Group Rule - Allow Node-to-Node Traffic
+# -----------------------------------------------------------------------------
+resource "aws_security_group_rule" "node_ingress_self" {
+  description              = "Allow node-to-node communication"
+  type                     = "ingress"
+  from_port                = 0
+  to_port                  = 0
+  protocol                 = "-1"
+  security_group_id        = module.eks.node_security_group_id
+  source_security_group_id = module.eks.node_security_group_id
+
+  lifecycle {
+    create_before_destroy = false
+  }
+}
+
+# -----------------------------------------------------------------------------
 # Outputs
 # -----------------------------------------------------------------------------
 output "vpc_id" {
@@ -71,6 +98,11 @@ output "cluster_region" {
 output "oidc_provider_arn" {
   description = "OIDC Provider ARN for IRSA"
   value       = module.eks.oidc_provider_arn
+}
+
+output "acm_certificate_arn" {
+  description = "ACM Certificate ARN"
+  value       = module.acm.acm_certificate_arn
 }
 
 # -----------------------------------------------------------------------------

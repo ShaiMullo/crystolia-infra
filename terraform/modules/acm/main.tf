@@ -1,19 +1,38 @@
+# -----------------------------------------------------------------------------
+# Route53 Hosted Zone Lookups
+# -----------------------------------------------------------------------------
+data "aws_route53_zone" "com" {
+  name         = "crystolia.com."
+  private_zone = false
+}
+
+# -----------------------------------------------------------------------------
+# ACM Certificate
+# -----------------------------------------------------------------------------
 resource "aws_acm_certificate" "main" {
-  domain_name       = var.domain_name
+  domain_name       = "crystolia.com"
   validation_method = "DNS"
 
-  subject_alternative_names = var.alternative_name
+  subject_alternative_names = [
+    "*.crystolia.com"
+  ]
 
-  tags = {
-    Environment = var.environment
-    Name        = "${var.environment}-cert"
-  }
+  tags = merge(
+    var.common_tags,
+    {
+      Environment = var.environment
+      Name        = "${var.environment}-cert"
+    }
+  )
 
   lifecycle {
     create_before_destroy = true
   }
 }
 
+# -----------------------------------------------------------------------------
+# DNS Validation Records
+# -----------------------------------------------------------------------------
 resource "aws_route53_record" "validation" {
   for_each = {
     for dvo in aws_acm_certificate.main.domain_validation_options : dvo.domain_name => dvo
@@ -24,9 +43,12 @@ resource "aws_route53_record" "validation" {
   records         = [each.value.resource_record_value]
   ttl             = 60
   type            = each.value.resource_record_type
-  zone_id         = var.zone_id
+  zone_id         = data.aws_route53_zone.com.zone_id
 }
 
+# -----------------------------------------------------------------------------
+# Certificate Validation
+# -----------------------------------------------------------------------------
 resource "aws_acm_certificate_validation" "main" {
   certificate_arn         = aws_acm_certificate.main.arn
   validation_record_fqdns = [for record in aws_route53_record.validation : record.fqdn]
