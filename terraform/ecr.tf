@@ -82,6 +82,45 @@ resource "aws_ecr_lifecycle_policy" "frontend" {
 }
 
 # -----------------------------------------------------------------------------
+# Frontend Admin Repository
+# -----------------------------------------------------------------------------
+
+resource "aws_ecr_repository" "frontend_admin" {
+  name                 = "crystolia-frontend-admin"
+  image_tag_mutability = "MUTABLE"
+
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+
+  tags = merge(var.common_tags, {
+    Name      = "crystolia-frontend-admin"
+    Component = "frontend-admin"
+  })
+}
+
+resource "aws_ecr_lifecycle_policy" "frontend_admin" {
+  repository = aws_ecr_repository.frontend_admin.name
+
+  policy = jsonencode({
+    rules = [
+      {
+        rulePriority = 1
+        description  = "Keep last 10 images"
+        selection = {
+          tagStatus   = "any"
+          countType   = "imageCountMoreThan"
+          countNumber = 10
+        }
+        action = {
+          type = "expire"
+        }
+      }
+    ]
+  })
+}
+
+# -----------------------------------------------------------------------------
 # Outputs
 # -----------------------------------------------------------------------------
 
@@ -93,4 +132,9 @@ output "ecr_backend_url" {
 output "ecr_frontend_url" {
   description = "ECR repository URL for frontend"
   value       = aws_ecr_repository.frontend.repository_url
+}
+
+output "ecr_frontend_admin_url" {
+  description = "ECR repository URL for frontend-admin"
+  value       = aws_ecr_repository.frontend_admin.repository_url
 }

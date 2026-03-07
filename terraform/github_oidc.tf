@@ -266,7 +266,8 @@ resource "aws_iam_policy" "ecr_push" {
         ]
         Resource = [
           aws_ecr_repository.backend.arn,
-          aws_ecr_repository.frontend.arn
+          aws_ecr_repository.frontend.arn,
+          aws_ecr_repository.frontend_admin.arn
         ]
       }
     ]
