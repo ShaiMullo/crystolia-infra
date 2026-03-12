@@ -3,15 +3,15 @@ resource "kubernetes_manifest" "root_app" {
     apiVersion = "argoproj.io/v1alpha1"
     kind       = "Application"
     metadata = {
-      name      = "crystolia-root"
+      name      = "root-app"
       namespace = "argocd"
     }
     spec = {
       project = "default"
       source = {
-        repoURL        = "https://github.com/ShaiMullo/crystolia-gitops"
+        repoURL        = "git@github.com:ShaiMullo/crystolia-gitops.git"
         targetRevision = "main"
-        path           = "apps"
+        path           = "argocd/apps"
       }
       destination = {
         server    = "https://kubernetes.default.svc"
@@ -25,6 +25,4 @@ resource "kubernetes_manifest" "root_app" {
       }
     }
   }
-
-  depends_on = [kubernetes_secret.argocd_github_repo]
 }

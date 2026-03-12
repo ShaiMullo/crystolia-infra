@@ -11,7 +11,7 @@ module "eks" {
 
   # API Access - Public for demo (restrict in production)
   cluster_endpoint_public_access       = true
-  cluster_endpoint_public_access_cidrs = ["147.235.221.96/32"]
+  cluster_endpoint_public_access_cidrs = ["147.235.222.50/32"]
 
   # VPC Configuration
   vpc_id     = var.vpc_id
