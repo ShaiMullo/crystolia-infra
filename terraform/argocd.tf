@@ -41,7 +41,7 @@ resource "helm_release" "argocd" {
 
   depends_on = [
     module.eks,
-    helm_release.ingress_nginx
+    helm_release.aws_load_balancer_controller
   ]
 }
 
@@ -51,15 +51,17 @@ resource "kubernetes_ingress_v1" "argocd" {
     namespace = "argocd"
 
     annotations = {
-      "kubernetes.io/ingress.class"                    = "nginx"
-      "nginx.ingress.kubernetes.io/backend-protocol"   = "HTTP"
-      "nginx.ingress.kubernetes.io/ssl-redirect"       = "false"
-      "nginx.ingress.kubernetes.io/force-ssl-redirect" = "false"
+      "alb.ingress.kubernetes.io/scheme"           = "internet-facing"
+      "alb.ingress.kubernetes.io/target-type"      = "ip"
+      "alb.ingress.kubernetes.io/backend-protocol" = "HTTP"
+      "alb.ingress.kubernetes.io/listen-ports"     = "[{\"HTTPS\":443}, {\"HTTP\":80}]"
+      "alb.ingress.kubernetes.io/certificate-arn"  = module.acm.acm_certificate_arn
+      "alb.ingress.kubernetes.io/group.name"       = "staging-alb"
     }
   }
 
   spec {
-    ingress_class_name = "nginx"
+    ingress_class_name = "alb"
 
     rule {
       host = "argocd.crystolia.com"

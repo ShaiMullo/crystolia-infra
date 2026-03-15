@@ -11,7 +11,7 @@ module "eks" {
 
   # API Access - Public for demo (restrict in production)
   cluster_endpoint_public_access       = true
-  cluster_endpoint_public_access_cidrs = ["147.235.222.50/32"]
+  cluster_endpoint_public_access_cidrs = ["5.29.118.90/32"]
 
   # VPC Configuration
   vpc_id     = var.vpc_id
@@ -36,8 +36,8 @@ module "eks" {
 
       # Scaling for workloads
       min_size     = 2
-      max_size     = 3
-      desired_size = 2
+      max_size     = 4
+      desired_size = 3
 
       # Disk configuration
       disk_size = 20

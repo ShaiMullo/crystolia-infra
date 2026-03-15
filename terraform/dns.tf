@@ -18,3 +18,42 @@ resource "aws_route53_record" "www" {
     ignore_changes = all
   }
 }
+
+resource "aws_route53_record" "staging" {
+  zone_id         = data.aws_route53_zone.com.zone_id
+  name            = "staging.crystolia.com"
+  type            = "A"
+  allow_overwrite = true
+
+  alias {
+    name                   = "k8s-crystoli-crystoli-ca14e383fb-439027048.us-east-1.elb.amazonaws.com"
+    zone_id                = "Z35SXDOTRQ7X7K"
+    evaluate_target_health = true
+  }
+}
+
+resource "aws_route53_record" "admin_staging" {
+  zone_id         = data.aws_route53_zone.com.zone_id
+  name            = "admin-staging.crystolia.com"
+  type            = "A"
+  allow_overwrite = true
+
+  alias {
+    name                   = "k8s-crystoli-crystoli-ca14e383fb-439027048.us-east-1.elb.amazonaws.com"
+    zone_id                = "Z35SXDOTRQ7X7K"
+    evaluate_target_health = true
+  }
+}
+
+resource "aws_route53_record" "monitoring_staging" {
+  zone_id         = data.aws_route53_zone.com.zone_id
+  name            = "monitoring-staging.crystolia.com"
+  type            = "A"
+  allow_overwrite = true
+
+  alias {
+    name                   = "k8s-monitori-monitori-b8f2c71a0d-537641054.us-east-1.elb.amazonaws.com"
+    zone_id                = "Z35SXDOTRQ7X7K"
+    evaluate_target_health = true
+  }
+}
