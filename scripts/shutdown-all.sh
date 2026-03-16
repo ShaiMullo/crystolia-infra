@@ -26,6 +26,7 @@ TERRAFORM_DIR="${SCRIPT_DIR}/../terraform"
 REGION="us-east-1"
 CLUSTER_NAME="crystolia-cluster-demo"
 BACKUP_BUCKET="crystolia-backups"
+VPC_ID=""   # populated in pre-flight from the live EKS cluster
 
 RED='\033[0;31m'; YELLOW='\033[1;33m'; GREEN='\033[0;32m'; CYAN='\033[0;36m'; NC='\033[0m'
 log_info()  { echo -e "${GREEN}[INFO]${NC}  $*"; }
@@ -72,6 +73,19 @@ fi
 NODE_COUNT=$(kubectl get nodes --no-headers 2>/dev/null | wc -l | tr -d ' ')
 log_info "Cluster reachable. Nodes online: ${NODE_COUNT}"
 
+# Capture VPC ID now while the cluster is still live.
+# Used throughout cleanup to scope all AWS queries to this project's VPC only.
+VPC_ID=$(aws eks describe-cluster \
+  --name "${CLUSTER_NAME}" \
+  --region "${REGION}" \
+  --query "cluster.resourcesVpcConfig.vpcId" \
+  --output text 2>/dev/null || true)
+if [[ -z "${VPC_ID}" || "${VPC_ID}" == "None" ]]; then
+  log_error "Could not determine VPC ID from cluster '${CLUSTER_NAME}'. Cannot scope cleanup safely."
+  exit 1
+fi
+log_info "Project VPC: ${VPC_ID}"
+
 # =============================================================================
 # MONGODB BACKUP CHECK
 # =============================================================================
@@ -97,7 +111,7 @@ log_warn "WILL BE DESTROYED:"
 log_warn "  • EKS cluster: ${CLUSTER_NAME} (control plane)"
 log_warn "  • EKS managed node group: general-demo (all EC2 t3.medium instances)"
 log_warn "  • NAT Gateway + Elastic IP (us-east-1)"
-log_warn "  • VPC 10.0.0.0/16 + all subnets, route tables, internet gateway"
+log_warn "  • VPC ${VPC_ID} + all subnets, route tables, internet gateway"
 log_warn "  • Helm release: argocd"
 log_warn "  • Helm release: aws-load-balancer-controller"
 log_warn "  • EKS addon: aws-ebs-csi-driver"
@@ -136,7 +150,7 @@ for APP in $(kubectl get application -n argocd -o name 2>/dev/null || true); do
 done
 log_info "ArgoCD auto-sync suspended."
 
-log_info "Deleting all Ingress resources across all namespaces (triggers ALB deletion)..."
+log_info "Deleting all Ingress resources across all namespaces (triggers ALB deletion by LBC)..."
 kubectl delete ingress --all -n crystolia  --timeout=90s 2>/dev/null || true
 kubectl delete ingress --all -n monitoring --timeout=90s 2>/dev/null || true
 kubectl delete ingress --all -n argocd     --timeout=90s 2>/dev/null || true
@@ -145,34 +159,246 @@ log_info "Deleting all PVCs (triggers EBS volume deletion via EBS CSI driver)...
 kubectl delete pvc --all -n crystolia  --timeout=90s 2>/dev/null || true
 kubectl delete pvc --all -n monitoring --timeout=90s 2>/dev/null || true
 
-# Wait for ALBs to be deregistered
-log_info "Waiting up to 4 minutes for staging ALBs to be deleted from AWS..."
+# ---------------------------------------------------------------------------
+# Wait for LBC to delete ALBs gracefully (scoped to this project's VPC).
+# Using VPC_ID instead of name-prefix matching catches all ALBs regardless
+# of how the LBC named them.
+# ---------------------------------------------------------------------------
+log_info "Waiting up to 4 minutes for ALBs in VPC ${VPC_ID} to be deleted by LBC..."
 TIMEOUT=240; ELAPSED=0
 while true; do
   ALB_COUNT=$(aws elbv2 describe-load-balancers --region "${REGION}" \
-    --query "length(LoadBalancers[?contains(LoadBalancerName,'k8s-crystoli') || contains(LoadBalancerName,'k8s-monitori') || contains(LoadBalancerName,'k8s-argocd')])" \
+    --query "length(LoadBalancers[?VpcId=='${VPC_ID}'])" \
     --output text 2>/dev/null || echo "0")
   if [[ "${ALB_COUNT}" -eq 0 ]]; then
-    log_info "ALBs confirmed deleted."
+    log_info "ALBs confirmed deleted by LBC."
     break
   fi
   if [[ "${ELAPSED}" -ge "${TIMEOUT}" ]]; then
-    log_warn "ALBs still present after ${TIMEOUT}s. Proceeding — they may clean up on their own."
-    log_warn "If not, delete them manually in the AWS console before the next startup."
-    aws elbv2 describe-load-balancers --region "${REGION}" \
-      --query "LoadBalancers[?contains(LoadBalancerName,'k8s-')].[LoadBalancerName,LoadBalancerArn]" \
-      --output table 2>/dev/null || true
+    log_warn "LBC did not delete all ALBs within ${TIMEOUT}s (${ALB_COUNT} remaining)."
+    log_warn "Proceeding to force-delete them via AWS CLI."
     break
   fi
   log_info "  ALBs still deleting (count: ${ALB_COUNT}) — ${ELAPSED}s elapsed..."
   sleep 15; ELAPSED=$((ELAPSED + 15))
 done
 
+# ---------------------------------------------------------------------------
+# Force-delete any ALBs that LBC failed to remove.
+# This prevents VPC deletion from failing due to orphaned load balancer ENIs.
+# ---------------------------------------------------------------------------
+REMAINING_ALB_ARNS=$(aws elbv2 describe-load-balancers --region "${REGION}" \
+  --query "LoadBalancers[?VpcId=='${VPC_ID}'].LoadBalancerArn" \
+  --output text 2>/dev/null || true)
+
+if [[ -n "${REMAINING_ALB_ARNS}" ]]; then
+  log_warn "Force-deleting ${REMAINING_ALB_ARNS##*/} ALBs that LBC did not clean up..."
+  for ARN in ${REMAINING_ALB_ARNS}; do
+    ALB_NAME=$(aws elbv2 describe-load-balancers \
+      --load-balancer-arns "${ARN}" --region "${REGION}" \
+      --query "LoadBalancers[0].LoadBalancerName" --output text 2>/dev/null || echo "${ARN##*/}")
+    log_warn "  Deleting ALB: ${ALB_NAME}"
+    aws elbv2 delete-load-balancer \
+      --load-balancer-arn "${ARN}" \
+      --region "${REGION}" 2>/dev/null || log_warn "  Could not delete ${ALB_NAME} — may already be deleting."
+  done
+
+  log_info "Waiting up to 3 minutes for force-deleted ALBs to be fully gone..."
+  TIMEOUT=180; ELAPSED=0
+  while true; do
+    ALB_COUNT=$(aws elbv2 describe-load-balancers --region "${REGION}" \
+      --query "length(LoadBalancers[?VpcId=='${VPC_ID}'])" \
+      --output text 2>/dev/null || echo "0")
+    if [[ "${ALB_COUNT}" -eq 0 ]]; then
+      log_info "All ALBs confirmed gone."
+      break
+    fi
+    if [[ "${ELAPSED}" -ge "${TIMEOUT}" ]]; then
+      log_error "ALBs still present after ${TIMEOUT}s of force-deletion. This will likely block VPC deletion."
+      log_error "Manual action required:"
+      aws elbv2 describe-load-balancers --region "${REGION}" \
+        --query "LoadBalancers[?VpcId=='${VPC_ID}'].[LoadBalancerName,LoadBalancerArn,State.Code]" \
+        --output table 2>/dev/null || true
+      log_error "Run: aws elbv2 delete-load-balancer --load-balancer-arn <ARN> --region ${REGION}"
+      exit 1
+    fi
+    log_info "  ALBs still deleting (count: ${ALB_COUNT}) — ${ELAPSED}s elapsed..."
+    sleep 10; ELAPSED=$((ELAPSED + 10))
+  done
+fi
+
+# ---------------------------------------------------------------------------
+# Wait for ELB-owned ENIs to clear.
+# When an ALB is deleted, AWS asynchronously releases its ENIs. If we proceed
+# too quickly, the VPC still has ENIs that block subnet deletion.
+# ---------------------------------------------------------------------------
+log_info "Waiting for ELB-owned ENIs in VPC ${VPC_ID} to be released (up to 90s)..."
+TIMEOUT=90; ELAPSED=0
+while true; do
+  ELB_ENI_COUNT=$(aws ec2 describe-network-interfaces --region "${REGION}" \
+    --filters \
+      "Name=vpc-id,Values=${VPC_ID}" \
+      "Name=requester-id,Values=amazon-elb" \
+    --query "length(NetworkInterfaces)" \
+    --output text 2>/dev/null || echo "0")
+  if [[ "${ELB_ENI_COUNT}" -eq 0 ]]; then
+    log_info "ELB-owned ENIs: none remaining."
+    break
+  fi
+  if [[ "${ELAPSED}" -ge "${TIMEOUT}" ]]; then
+    log_warn "${ELB_ENI_COUNT} ELB-owned ENI(s) still present after ${TIMEOUT}s — continuing anyway."
+    log_warn "These should release on their own shortly. Check: aws ec2 describe-network-interfaces \\"
+    log_warn "  --filters Name=vpc-id,Values=${VPC_ID} Name=requester-id,Values=amazon-elb"
+    break
+  fi
+  log_info "  ELB-owned ENIs still releasing (count: ${ELB_ENI_COUNT}) — ${ELAPSED}s elapsed..."
+  sleep 10; ELAPSED=$((ELAPSED + 10))
+done
+
+# =============================================================================
+# PHASE 1.5: AWS resource cleanup — orphaned k8s-* security groups
+#
+# The AWS LBC creates SGs named `k8s-*` for ALB-level security groups.
+# These are NOT in Terraform state. When the LBC pod is gone or the ALB was
+# already deleted, the LBC may not clean these up. If they remain, Terraform
+# will fail deleting the VPC because the SGs are still referencing subnets.
+#
+# Safe rule: if a k8s-* SG has zero ENI attachments, delete it.
+# If ENIs still reference it, we print a clear error and stop — do not
+# delete SGs with active attachments as this could disrupt other resources.
+# =============================================================================
+log_step "Phase 1.5: Orphaned k8s-* security group cleanup"
+
+K8S_SGS=$(aws ec2 describe-security-groups --region "${REGION}" \
+  --filters \
+    "Name=vpc-id,Values=${VPC_ID}" \
+    "Name=group-name,Values=k8s-*" \
+  --query "SecurityGroups[*].GroupId" \
+  --output text 2>/dev/null || true)
+
+if [[ -z "${K8S_SGS}" ]]; then
+  log_info "No k8s-* security groups found in VPC — nothing to clean up."
+else
+  BLOCKED_SGS=0
+  for SG_ID in ${K8S_SGS}; do
+    SG_NAME=$(aws ec2 describe-security-groups --region "${REGION}" \
+      --group-ids "${SG_ID}" \
+      --query "SecurityGroups[0].GroupName" \
+      --output text 2>/dev/null || echo "${SG_ID}")
+
+    ENI_COUNT=$(aws ec2 describe-network-interfaces --region "${REGION}" \
+      --filters \
+        "Name=vpc-id,Values=${VPC_ID}" \
+        "Name=group-id,Values=${SG_ID}" \
+      --query "length(NetworkInterfaces)" \
+      --output text 2>/dev/null || echo "0")
+
+    if [[ "${ENI_COUNT}" -eq 0 ]]; then
+      log_info "Deleting orphaned k8s SG (no ENI attachments): ${SG_NAME} (${SG_ID})"
+      aws ec2 delete-security-group \
+        --group-id "${SG_ID}" \
+        --region "${REGION}" 2>/dev/null \
+        && log_info "  Deleted: ${SG_ID}" \
+        || log_warn "  Could not delete ${SG_ID} — may have SG-to-SG references; Terraform may handle it."
+    else
+      log_warn "k8s SG ${SG_NAME} (${SG_ID}) still has ${ENI_COUNT} ENI attachment(s) — cannot auto-delete."
+      BLOCKED_SGS=$((BLOCKED_SGS + 1))
+    fi
+  done
+
+  if [[ "${BLOCKED_SGS}" -gt 0 ]]; then
+    log_warn "${BLOCKED_SGS} k8s SG(s) with active ENIs could not be auto-deleted."
+    log_warn "These may still block VPC deletion. The pre-destroy check below will confirm."
+  fi
+fi
+
+# =============================================================================
+# PHASE 1.6: Pre-destroy VPC blocker check
+#
+# Enumerate everything that will block 'terraform destroy module.vpc'.
+# If any blockers remain after all cleanup above, we stop here with clear
+# actionable instructions rather than letting Terraform fail mid-destroy.
+# =============================================================================
+log_step "Phase 1.6: Pre-destroy VPC dependency check"
+
+BLOCKERS=0
+
+# Check: ALBs still in VPC
+FINAL_ALB_COUNT=$(aws elbv2 describe-load-balancers --region "${REGION}" \
+  --query "length(LoadBalancers[?VpcId=='${VPC_ID}'])" \
+  --output text 2>/dev/null || echo "0")
+if [[ "${FINAL_ALB_COUNT}" -gt 0 ]]; then
+  log_error "BLOCKER: ${FINAL_ALB_COUNT} ALB(s) still present in VPC ${VPC_ID}."
+  aws elbv2 describe-load-balancers --region "${REGION}" \
+    --query "LoadBalancers[?VpcId=='${VPC_ID}'].[LoadBalancerName,LoadBalancerArn]" \
+    --output table 2>/dev/null || true
+  log_error "Fix: aws elbv2 delete-load-balancer --load-balancer-arn <ARN> --region ${REGION}"
+  BLOCKERS=$((BLOCKERS + FINAL_ALB_COUNT))
+fi
+
+# Check: ELB-owned ENIs still in VPC
+FINAL_ELB_ENI_COUNT=$(aws ec2 describe-network-interfaces --region "${REGION}" \
+  --filters \
+    "Name=vpc-id,Values=${VPC_ID}" \
+    "Name=requester-id,Values=amazon-elb" \
+  --query "length(NetworkInterfaces)" \
+  --output text 2>/dev/null || echo "0")
+if [[ "${FINAL_ELB_ENI_COUNT}" -gt 0 ]]; then
+  log_error "BLOCKER: ${FINAL_ELB_ENI_COUNT} ELB-owned ENI(s) still in VPC ${VPC_ID}."
+  aws ec2 describe-network-interfaces --region "${REGION}" \
+    --filters "Name=vpc-id,Values=${VPC_ID}" "Name=requester-id,Values=amazon-elb" \
+    --query "NetworkInterfaces[*].[NetworkInterfaceId,Description,Status]" \
+    --output table 2>/dev/null || true
+  log_error "These usually self-clear within 2 minutes after ALB deletion."
+  log_error "Wait and re-run, or detach and delete manually."
+  BLOCKERS=$((BLOCKERS + FINAL_ELB_ENI_COUNT))
+fi
+
+# Check: remaining k8s-* SGs with active ENIs
+REMAINING_K8S_SGS=$(aws ec2 describe-security-groups --region "${REGION}" \
+  --filters \
+    "Name=vpc-id,Values=${VPC_ID}" \
+    "Name=group-name,Values=k8s-*" \
+  --query "SecurityGroups[*].GroupId" \
+  --output text 2>/dev/null || true)
+for SG_ID in ${REMAINING_K8S_SGS}; do
+  SG_NAME=$(aws ec2 describe-security-groups --region "${REGION}" \
+    --group-ids "${SG_ID}" \
+    --query "SecurityGroups[0].GroupName" --output text 2>/dev/null || echo "${SG_ID}")
+  ENI_COUNT=$(aws ec2 describe-network-interfaces --region "${REGION}" \
+    --filters "Name=vpc-id,Values=${VPC_ID}" "Name=group-id,Values=${SG_ID}" \
+    --query "length(NetworkInterfaces)" --output text 2>/dev/null || echo "0")
+  if [[ "${ENI_COUNT}" -gt 0 ]]; then
+    log_error "BLOCKER: k8s SG ${SG_NAME} (${SG_ID}) still has ${ENI_COUNT} active ENI(s)."
+    log_error "Fix: find and delete the ENI(s) using:"
+    log_error "  aws ec2 describe-network-interfaces --filters Name=group-id,Values=${SG_ID} --region ${REGION}"
+    BLOCKERS=$((BLOCKERS + 1))
+  fi
+done
+
+if [[ "${BLOCKERS}" -gt 0 ]]; then
+  log_error ""
+  log_error "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  log_error "  STOP: ${BLOCKERS} VPC dependency blocker(s) found."
+  log_error "  Terraform would fail destroying module.vpc at this point."
+  log_error "  Resolve the items listed above, then re-run shutdown-all.sh."
+  log_error "  (The script is idempotent — phases already completed are safe to re-run.)"
+  log_error "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  exit 1
+fi
+
+log_info "VPC dependency check passed — no blockers found. Safe to proceed."
+
 # =============================================================================
 # PHASE 2: Remove Kubernetes Terraform-managed resources from state
 # We deleted these with kubectl above. Removing them from state prevents
 # Terraform from trying to DELETE them via the Kubernetes provider during
 # destroy (which would fail once the EKS cluster itself is torn down).
+#
+# Resource keys confirmed from argocd.tf, ebs-csi.tf, argocd-root-app.tf:
+#   kubernetes_ingress_v1.argocd     → argocd-server-ingress in ns argocd
+#   kubernetes_manifest.root_app     → root-app Application in ns argocd
+#   kubernetes_storage_class.gp3_csi → gp3-csi StorageClass
 # =============================================================================
 log_step "Phase 2: Detach Kubernetes provider resources from Terraform state"
 
@@ -184,7 +410,7 @@ for RESOURCE in \
     log_info "Removing from state: ${RESOURCE}"
     terraform state rm "${RESOURCE}"
   else
-    log_info "Already absent from state: ${RESOURCE}"
+    log_info "Already absent from state (skipping): ${RESOURCE}"
   fi
 done
 
