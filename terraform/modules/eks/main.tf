@@ -10,8 +10,9 @@ module "eks" {
   cluster_version = "1.29"
 
   # API Access - Public for demo (restrict in production)
+  # 0.0.0.0/0 for demo: avoids CIDR drift when IP changes between sessions.
   cluster_endpoint_public_access       = true
-  cluster_endpoint_public_access_cidrs = ["5.29.118.90/32"]
+  cluster_endpoint_public_access_cidrs = ["0.0.0.0/0"]
 
   # VPC Configuration
   vpc_id     = var.vpc_id
