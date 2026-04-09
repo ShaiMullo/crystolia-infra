@@ -6,3 +6,15 @@
 .terraform.lock.hcl
 terraform/tfplan
 *.tfplan
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.plan
+
+# Lambda artifacts
+*.zip
+
+# Mac
+.DS_Store
