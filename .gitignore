@@ -1,20 +1,27 @@
-.terraform/
-*.tfstate
-*.tfstate.backup
-*.tfvars
-.DS_Store
-.terraform.lock.hcl
-terraform/tfplan
-*.tfplan
-
 # Terraform
 .terraform/
+.terraform.lock.hcl
 *.tfstate
 *.tfstate.*
+*.tfvars
+*.tfplan
 *.plan
+terraform/tfplan
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+crash.log
+terraform.rc
 
 # Lambda artifacts
 *.zip
 
-# Mac
+# Secrets & keys
+.env
+.env.*
+*.pem
+*.key
+
+# OS
 .DS_Store
