@@ -1,0 +1,131 @@
+{
+  "markets": [
+    {
+      "aws": {
+        "acm": {
+          "certificateArn": null,
+          "source": "wildcard-lookup"
+        },
+        "bucket": "crystolia-landing-site",
+        "cloudfront": {
+          "aliases": [
+            "crystolia.com",
+            "www.crystolia.com"
+          ],
+          "distributionId": "E289E39KBDVOUK",
+          "priceClass": "PriceClass_100"
+        },
+        "region": "us-east-1",
+        "route53": {
+          "hostedZoneId": "Z09838333QSV2YSAPVCWL",
+          "manageApexWww": true
+        },
+        "terraform": {
+          "module": "standalone-legacy",
+          "stateKey": "landing/terraform.tfstate"
+        }
+      },
+      "defaultLocale": "en",
+      "deploymentType": "s3-cloudfront",
+      "domain": "crystolia.com",
+      "features": {
+        "geoRedirect": false,
+        "rootLocaleRewrite": false
+      },
+      "id": "il-en",
+      "locale": "en",
+      "provider": "aws",
+      "seo": {
+        "host": "https://crystolia.com",
+        "robotsHost": "https://crystolia.com",
+        "sitemapHost": "https://crystolia.com"
+      },
+      "status": "live"
+    },
+    {
+      "aws": {
+        "acm": {
+          "certificateArn": "arn:aws:acm:us-east-1:268456953512:certificate/84c4444d-5ab9-4539-b78f-8e450cf5af6b",
+          "source": "imported"
+        },
+        "bucket": "crystolia-landing-ru",
+        "cloudfront": {
+          "aliases": [
+            "crystolia.ru",
+            "www.crystolia.ru"
+          ],
+          "distributionId": "E2P1QZWI52R35R",
+          "priceClass": "PriceClass_100"
+        },
+        "region": "us-east-1",
+        "route53": {
+          "hostedZoneId": "Z00331382Z69L1TYT5RCL",
+          "manageApexWww": true
+        },
+        "terraform": {
+          "module": "modules/landing-domain",
+          "stateKey": "landing-ru/terraform.tfstate"
+        }
+      },
+      "defaultLocale": "ru",
+      "deploymentType": "s3-cloudfront",
+      "domain": "crystolia.ru",
+      "features": {
+        "geoRedirect": false,
+        "rootLocaleRewrite": true
+      },
+      "id": "ru-ru",
+      "locale": "ru",
+      "provider": "aws",
+      "seo": {
+        "host": "https://crystolia.ru",
+        "robotsHost": "https://crystolia.ru",
+        "sitemapHost": "https://crystolia.ru"
+      },
+      "status": "provisioned"
+    },
+    {
+      "aws": {
+        "acm": {
+          "certificateArn": null,
+          "source": "acm-issued"
+        },
+        "bucket": null,
+        "cloudfront": {
+          "aliases": [
+            "crystolia.co.il",
+            "www.crystolia.co.il"
+          ],
+          "distributionId": null,
+          "priceClass": "PriceClass_100"
+        },
+        "region": "us-east-1",
+        "route53": {
+          "hostedZoneId": "Z00702083FKV46OHW88RZ",
+          "manageApexWww": true
+        },
+        "terraform": {
+          "module": "modules/landing-domain",
+          "stateKey": "landing-coil/terraform.tfstate"
+        }
+      },
+      "defaultLocale": "he",
+      "deploymentType": "s3-cloudfront",
+      "domain": "crystolia.co.il",
+      "features": {
+        "geoRedirect": false,
+        "rootLocaleRewrite": true
+      },
+      "id": "il-he",
+      "locale": "he",
+      "provider": "aws",
+      "seo": {
+        "host": "https://crystolia.co.il",
+        "robotsHost": "https://crystolia.co.il",
+        "sitemapHost": "https://crystolia.co.il"
+      },
+      "status": "planned"
+    }
+  ],
+  "version": 1
+}
