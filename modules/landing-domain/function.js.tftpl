@@ -1,0 +1,53 @@
+function handler(event) {
+  var request = event.request;
+  var headers = request.headers;
+  var host = (headers.host && headers.host.value) || '';
+
+  // 1) Canonicalize host: www.<apex> -> <apex> (301).
+  if (host === 'www.${domain_name}') {
+    return {
+      statusCode: 301,
+      statusDescription: 'Moved Permanently',
+      headers: { location: { value: 'https://${domain_name}' + request.uri } }
+    };
+  }
+%{ if enable_geo_redirect ~}
+  // 2) Smart geo/language redirect — apex only, and only when the visitor has
+  //    NOT made an explicit choice (?chosen=1 or the cl_loc cookie set by the
+  //    landing's language switcher). Loop-safe: the localized domains never run
+  //    this block, so they cannot bounce the visitor back.
+  if (request.uri === '/' || request.uri === '/index.html') {
+    var qs = request.querystring || {};
+    var cookie = (headers.cookie && headers.cookie.value) || '';
+    var chosen = ('chosen' in qs) || (cookie.indexOf('cl_loc=') !== -1);
+    if (!chosen) {
+      var country = (headers['cloudfront-viewer-country'] && headers['cloudfront-viewer-country'].value) || '';
+      var lang = ((headers['accept-language'] && headers['accept-language'].value) || '').toLowerCase();
+      var target = '';
+%{ for cc, dom in geo_redirects ~}
+      if (country === '${cc}') { target = '${dom}'; }
+%{ endfor ~}
+%{ if ru_accept_language_domain != "" ~}
+      if (target === '' && lang.indexOf('ru') === 0) { target = '${ru_accept_language_domain}'; }
+%{ endif ~}
+      if (target !== '' && target !== '${domain_name}') {
+        return {
+          statusCode: 302,
+          statusDescription: 'Found',
+          headers: { location: { value: 'https://' + target + request.uri } }
+        };
+      }
+    }
+  }
+%{ endif ~}
+%{ if rewrite_root_to_locale ~}
+  // 3) Serve the per-domain default locale at the bare apex.
+  //    deploy-landing.sh uploads extensionless objects (e.g. "${default_locale}"),
+  //    so this resolves without an S3 redirect.
+  if (request.uri === '/' || request.uri === '/index.html') {
+    request.uri = '/${default_locale}';
+  }
+%{ endif ~}
+
+  return request;
+}
