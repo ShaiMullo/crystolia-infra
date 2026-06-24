@@ -17,7 +17,7 @@
 
 resource "aws_route53_record" "apex" {
   zone_id         = data.aws_route53_zone.main.zone_id
-  name            = var.domain_name
+  name            = local.domain_name
   type            = "A"
   allow_overwrite = true
 
@@ -30,7 +30,7 @@ resource "aws_route53_record" "apex" {
 
 resource "aws_route53_record" "www" {
   zone_id         = data.aws_route53_zone.main.zone_id
-  name            = "www.${var.domain_name}"
+  name            = "www.${local.domain_name}"
   type            = "A"
   allow_overwrite = true
 

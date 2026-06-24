@@ -5,13 +5,13 @@
 
 # Route53 hosted zone — created when domain was registered
 data "aws_route53_zone" "main" {
-  name         = "${var.domain_name}."
+  name         = "${local.domain_name}."
   private_zone = false
 }
 
 # ACM wildcard certificate — created by terraform/modules/acm/
 data "aws_acm_certificate" "wildcard" {
-  domain      = var.domain_name
+  domain      = local.domain_name
   statuses    = ["ISSUED"]
   most_recent = true
 }
