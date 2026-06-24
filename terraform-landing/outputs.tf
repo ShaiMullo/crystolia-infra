@@ -16,5 +16,5 @@ output "s3_bucket" {
 
 output "site_url" {
   description = "Live site URL"
-  value       = "https://${var.domain_name}"
+  value       = "https://${local.domain_name}"
 }

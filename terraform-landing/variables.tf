@@ -4,14 +4,5 @@ variable "aws_region" {
   default     = "us-east-1"
 }
 
-variable "domain_name" {
-  description = "Root domain name"
-  type        = string
-  default     = "crystolia.com"
-}
-
-variable "bucket_name" {
-  description = "S3 bucket name for landing site"
-  type        = string
-  default     = "crystolia-landing-site"
-}
+# domain_name / bucket_name are no longer variables — they come from the
+# platform manifest (see manifest.tf, market "il-en").

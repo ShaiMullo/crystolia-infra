@@ -16,7 +16,7 @@ resource "aws_cloudfront_origin_access_control" "landing" {
 resource "aws_cloudfront_distribution" "landing" {
   enabled             = true
   default_root_object = "index.html"
-  aliases             = [var.domain_name, "www.${var.domain_name}"]
+  aliases             = [local.domain_name, "www.${local.domain_name}"]
   price_class         = "PriceClass_100" # US + Europe only (cheapest)
   http_version        = "http2and3"
 
