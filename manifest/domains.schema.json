@@ -1,0 +1,148 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://crystolia.com/schemas/domains.lock.json",
+  "title": "Crystolia platform manifest (resolved lock)",
+  "description": "Validates the generated, fully-resolved domains.lock.json. The authored source is domains.manifest.yaml; generate.py merges `defaults` into each market before validation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "markets"],
+  "properties": {
+    "version": { "type": "integer", "const": 1 },
+    "markets": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/market" }
+    }
+  },
+  "definitions": {
+    "market": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id", "domain", "locale", "defaultLocale", "status",
+        "provider", "deploymentType", "aws", "seo", "features"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+$",
+          "description": "Stable market key, decoupled from the domain (e.g. il-en)."
+        },
+        "domain": {
+          "type": "string",
+          "pattern": "^(?!-)[a-z0-9-]+(\\.[a-z0-9-]+)+$"
+        },
+        "locale": { "type": "string", "pattern": "^[a-z]{2}$" },
+        "defaultLocale": { "type": "string", "pattern": "^[a-z]{2}$" },
+        "status": {
+          "type": "string",
+          "enum": ["planned", "provisioned", "live", "retired"]
+        },
+        "provider": {
+          "type": "string",
+          "enum": ["aws", "vercel", "cloudflare", "other"]
+        },
+        "deploymentType": {
+          "type": "string",
+          "enum": ["s3-cloudfront", "vercel", "other"]
+        },
+        "aws": { "$ref": "#/definitions/aws" },
+        "seo": { "$ref": "#/definitions/seo" },
+        "features": { "$ref": "#/definitions/features" },
+        "environments": {
+          "type": "object",
+          "description": "Optional per-environment override fragments (future use). Deep-merged onto the market by env-aware consumers.",
+          "additionalProperties": { "type": "object" }
+        }
+      }
+    },
+    "aws": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["region", "bucket", "cloudfront", "route53", "acm", "terraform"],
+      "properties": {
+        "region": { "type": "string", "pattern": "^[a-z]{2}-[a-z]+-[0-9]$" },
+        "bucket": { "type": ["string", "null"] },
+        "cloudfront": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["aliases", "priceClass"],
+          "properties": {
+            "distributionId": { "type": ["string", "null"] },
+            "aliases": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "type": "string" }
+            },
+            "priceClass": {
+              "type": "string",
+              "enum": ["PriceClass_100", "PriceClass_200", "PriceClass_All"]
+            }
+          }
+        },
+        "route53": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["hostedZoneId", "manageApexWww"],
+          "properties": {
+            "hostedZoneId": { "type": "string", "pattern": "^Z[A-Z0-9]+$" },
+            "manageApexWww": { "type": "boolean" }
+          }
+        },
+        "acm": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["source", "certificateArn"],
+          "properties": {
+            "source": {
+              "type": "string",
+              "enum": ["wildcard-lookup", "imported", "acm-issued"]
+            },
+            "certificateArn": {
+              "type": ["string", "null"],
+              "pattern": "^arn:aws:acm:[a-z0-9-]+:[0-9]{12}:certificate/[a-f0-9-]+$"
+            }
+          },
+          "allOf": [
+            {
+              "if": { "properties": { "source": { "const": "imported" } } },
+              "then": { "properties": { "certificateArn": { "type": "string" } } }
+            }
+          ]
+        },
+        "terraform": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["stateKey", "module"],
+          "properties": {
+            "stateKey": { "type": "string", "pattern": "\\.tfstate$" },
+            "module": {
+              "type": "string",
+              "enum": ["modules/landing-domain", "standalone-legacy"]
+            }
+          }
+        }
+      }
+    },
+    "seo": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["host", "robotsHost", "sitemapHost"],
+      "properties": {
+        "host": { "type": "string", "format": "uri", "pattern": "^https://" },
+        "robotsHost": { "type": "string", "format": "uri", "pattern": "^https://" },
+        "sitemapHost": { "type": "string", "format": "uri", "pattern": "^https://" }
+      }
+    },
+    "features": {
+      "type": "object",
+      "description": "Feature flags. Open-ended (additionalProperties:true) so new flags need no schema change.",
+      "additionalProperties": true,
+      "required": ["geoRedirect", "rootLocaleRewrite"],
+      "properties": {
+        "geoRedirect": { "type": "boolean" },
+        "rootLocaleRewrite": { "type": "boolean" }
+      }
+    }
+  }
+}

@@ -1,0 +1,115 @@
+# =============================================================================
+# Crystolia platform manifest — CANONICAL SOURCE OF TRUTH
+# =============================================================================
+# One record per market (country/locale/domain). Everything downstream
+# (Terraform, deploy-landing.sh, the Next.js landing, SEO generation, CI) is a
+# generic consumer of this file — adding a new market should be a single record
+# here plus a provisioning apply, nothing else.
+#
+# AUTHORING: edit THIS YAML only. `generate.py` deep-merges `defaults` into each
+# market, writes the fully-resolved `domains.lock.json`, and validates it against
+# `domains.schema.json`. Consumers read the lock, never this file.
+#
+# STEP 0 SCOPE: data only. No consumer is wired yet (no Terraform, no app). The
+# values below MIRROR CURRENT REALITY exactly (verified against AWS + repos), so
+# wiring consumers later is a pure, zero-drift refactor.
+# =============================================================================
+
+version: 1
+
+# Platform-wide defaults. Each market inherits these and may override any key
+# (deep-merged object-by-object; lists are replaced wholesale).
+defaults:
+  provider: aws
+  deploymentType: s3-cloudfront
+  aws:
+    region: us-east-1
+    cloudfront:
+      priceClass: PriceClass_100   # US + Europe (cheapest); matches both live distributions
+    route53:
+      manageApexWww: true          # apex + www records are owned by the landing stack
+    terraform:
+      module: modules/landing-domain
+  features:
+    geoRedirect: false             # smart geo/lang redirect (planned for crystolia.com, D4.3)
+    rootLocaleRewrite: true        # edge fn rewrites "/" -> "/{defaultLocale}"
+
+markets:
+  # ── crystolia.com (English / x-default) — LIVE ────────────────────────────
+  # NOTE: standalone hand-written stack (terraform-landing/), NOT the reusable
+  # module. Uses the *.crystolia.com wildcard cert via a data lookup, and
+  # 403/404 -> /en.html (200) — no edge root-rewrite. Reflected faithfully below.
+  - id: "il-en"
+    domain: "crystolia.com"
+    locale: "en"
+    defaultLocale: "en"
+    status: "live"
+    aws:
+      bucket: "crystolia-landing-site"
+      cloudfront:
+        distributionId: "E289E39KBDVOUK"
+        aliases: ["crystolia.com", "www.crystolia.com"]
+      route53:
+        hostedZoneId: "Z09838333QSV2YSAPVCWL"
+      acm:
+        source: "wildcard-lookup"      # data.aws_acm_certificate "*.crystolia.com"
+        certificateArn: null
+      terraform:
+        stateKey: "landing/terraform.tfstate"
+        module: "standalone-legacy"
+    seo:
+      host: "https://crystolia.com"
+      robotsHost: "https://crystolia.com"
+      sitemapHost: "https://crystolia.com"
+    features:
+      rootLocaleRewrite: false         # .com serves /en.html via custom_error_response
+
+  # ── crystolia.ru (Russian) — PROVISIONED, not yet public ──────────────────
+  - id: "ru-ru"
+    domain: "crystolia.ru"
+    locale: "ru"
+    defaultLocale: "ru"
+    status: "provisioned"              # built (D4.1) with go_live=false; zone has NS+SOA only
+    aws:
+      bucket: "crystolia-landing-ru"
+      cloudfront:
+        distributionId: "E2P1QZWI52R35R"
+        aliases: ["crystolia.ru", "www.crystolia.ru"]
+      route53:
+        hostedZoneId: "Z00331382Z69L1TYT5RCL"
+      acm:
+        source: "imported"             # Let's Encrypt cert imported into ACM us-east-1
+        certificateArn: "arn:aws:acm:us-east-1:268456953512:certificate/84c4444d-5ab9-4539-b78f-8e450cf5af6b"
+      terraform:
+        stateKey: "landing-ru/terraform.tfstate"
+    seo:
+      host: "https://crystolia.ru"
+      robotsHost: "https://crystolia.ru"
+      sitemapHost: "https://crystolia.ru"
+
+  # ── crystolia.co.il (Hebrew) — PLANNED ────────────────────────────────────
+  # REALITY: Route53 hosted zone exists (NS+SOA only). No bucket, no CloudFront,
+  # no ACM cert, no Vercel. status=planned means the manifest models it but the
+  # refactor provisions NOTHING. Standing it up later = flip status + fill
+  # bucket/cert + apply a new stack.
+  - id: "il-he"
+    domain: "crystolia.co.il"
+    locale: "he"
+    defaultLocale: "he"
+    status: "planned"
+    aws:
+      bucket: null
+      cloudfront:
+        distributionId: null
+        aliases: ["crystolia.co.il", "www.crystolia.co.il"]
+      route53:
+        hostedZoneId: "Z00702083FKV46OHW88RZ"
+      acm:
+        source: "acm-issued"
+        certificateArn: null
+      terraform:
+        stateKey: "landing-coil/terraform.tfstate"
+    seo:
+      host: "https://crystolia.co.il"
+      robotsHost: "https://crystolia.co.il"
+      sitemapHost: "https://crystolia.co.il"
