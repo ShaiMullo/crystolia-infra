@@ -90,7 +90,7 @@
           "certificateArn": null,
           "source": "acm-issued"
         },
-        "bucket": null,
+        "bucket": "crystolia-landing-coil",
         "cloudfront": {
           "aliases": [
             "crystolia.co.il",

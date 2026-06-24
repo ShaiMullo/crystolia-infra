@@ -87,18 +87,21 @@ markets:
       robotsHost: "https://crystolia.ru"
       sitemapHost: "https://crystolia.ru"
 
-  # ── crystolia.co.il (Hebrew) — PLANNED ────────────────────────────────────
-  # REALITY: Route53 hosted zone exists (NS+SOA only). No bucket, no CloudFront,
-  # no ACM cert, no Vercel. status=planned means the manifest models it but the
-  # refactor provisions NOTHING. Standing it up later = flip status + fill
-  # bucket/cert + apply a new stack.
+  # ── crystolia.co.il (Hebrew) — PLANNED (D4.2 stack defined, not yet applied) ──
+  # REALITY: Route53 hosted zone exists (NS+SOA only); no bucket/CloudFront/ACM
+  # cert provisioned yet. D4.2 Phase 1 adds the terraform-landing-coil stack
+  # (ACM-managed cert via Route53 DNS validation) but does NOT apply it. The
+  # bucket name below is the planned target the stack will create on apply.
+  # status stays "planned" until the stack is applied (then -> provisioned),
+  # so the deploy script stays build-only and the language switcher keeps the
+  # same-domain fallback for Hebrew.
   - id: "il-he"
     domain: "crystolia.co.il"
     locale: "he"
     defaultLocale: "he"
     status: "planned"
     aws:
-      bucket: null
+      bucket: "crystolia-landing-coil"
       cloudfront:
         distributionId: null
         aliases: ["crystolia.co.il", "www.crystolia.co.il"]
