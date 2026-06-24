@@ -87,19 +87,17 @@ resource "aws_acm_certificate" "this" {
 }
 
 resource "aws_route53_record" "cert_validation" {
-  for_each = (local.create_cert && var.create_cert_validation_records) ? {
-    for dvo in flatten([for c in aws_acm_certificate.this : c.domain_validation_options]) :
-    dvo.domain_name => {
-      name   = dvo.resource_record_name
-      type   = dvo.resource_record_type
-      record = dvo.resource_record_value
-    }
-  } : {}
+  # Static for_each keys (the cert's domains are known at plan time); the record
+  # name/type/value come from domain_validation_options as VALUES (known after
+  # apply — allowed). Deriving the keys from a count'd ACM cert's
+  # domain_validation_options instead trips "Invalid for_each argument".
+  for_each = (local.create_cert && var.create_cert_validation_records) ? toset(concat([var.domain_name], ["www.${var.domain_name}"])) : toset([])
 
-  zone_id         = var.route53_zone_id
-  name            = each.value.name
-  type            = each.value.type
-  records         = [each.value.record]
+  zone_id = var.route53_zone_id
+  name    = one([for dvo in aws_acm_certificate.this[0].domain_validation_options : dvo.resource_record_name if dvo.domain_name == each.value])
+  type    = one([for dvo in aws_acm_certificate.this[0].domain_validation_options : dvo.resource_record_type if dvo.domain_name == each.value])
+  records = [one([for dvo in aws_acm_certificate.this[0].domain_validation_options : dvo.resource_record_value if dvo.domain_name == each.value])]
+
   ttl             = 60
   allow_overwrite = true
 }
