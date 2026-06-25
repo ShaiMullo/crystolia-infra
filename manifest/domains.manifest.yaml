@@ -87,18 +87,18 @@ markets:
       robotsHost: "https://crystolia.ru"
       sitemapHost: "https://crystolia.ru"
 
-  # ── crystolia.co.il (Hebrew) — PROVISIONED (D4.2 applied, not yet public) ──
-  # crystolia.co.il was re-delegated from Vercel to Route53, then the
+  # ── crystolia.co.il (Hebrew) — LIVE ───────────────────────────────────────
+  # crystolia.co.il was re-delegated from Vercel to Route53, the
   # terraform-landing-coil stack was applied (ACM-managed cert ISSUED, S3 +
-  # CloudFront created). status=provisioned lets deploy-landing.sh push content
-  # (build + S3 sync + invalidate). The domain is still NOT public: no apex/www
-  # A-ALIAS records exist (go_live=false), so the language switcher keeps the
-  # same-domain fallback for Hebrew until go-live.
+  # CloudFront E1J25KKR57SJJQ), content deployed, then go_live=true applied —
+  # apex + www A-ALIAS records point at CloudFront and the domain is public.
+  # status=live lets the language switcher route Hebrew to canonical
+  # https://crystolia.co.il.
   - id: "il-he"
     domain: "crystolia.co.il"
     locale: "he"
     defaultLocale: "he"
-    status: "provisioned"
+    status: "live"
     aws:
       bucket: "crystolia-landing-coil"
       cloudfront:
