@@ -96,7 +96,7 @@
             "crystolia.co.il",
             "www.crystolia.co.il"
           ],
-          "distributionId": null,
+          "distributionId": "E1J25KKR57SJJQ",
           "priceClass": "PriceClass_100"
         },
         "region": "us-east-1",
@@ -124,7 +124,7 @@
         "robotsHost": "https://crystolia.co.il",
         "sitemapHost": "https://crystolia.co.il"
       },
-      "status": "planned"
+      "status": "provisioned"
     }
   ],
   "version": 1

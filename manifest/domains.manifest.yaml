@@ -87,23 +87,22 @@ markets:
       robotsHost: "https://crystolia.ru"
       sitemapHost: "https://crystolia.ru"
 
-  # ── crystolia.co.il (Hebrew) — PLANNED (D4.2 stack defined, not yet applied) ──
-  # REALITY: Route53 hosted zone exists (NS+SOA only); no bucket/CloudFront/ACM
-  # cert provisioned yet. D4.2 Phase 1 adds the terraform-landing-coil stack
-  # (ACM-managed cert via Route53 DNS validation) but does NOT apply it. The
-  # bucket name below is the planned target the stack will create on apply.
-  # status stays "planned" until the stack is applied (then -> provisioned),
-  # so the deploy script stays build-only and the language switcher keeps the
-  # same-domain fallback for Hebrew.
+  # ── crystolia.co.il (Hebrew) — PROVISIONED (D4.2 applied, not yet public) ──
+  # crystolia.co.il was re-delegated from Vercel to Route53, then the
+  # terraform-landing-coil stack was applied (ACM-managed cert ISSUED, S3 +
+  # CloudFront created). status=provisioned lets deploy-landing.sh push content
+  # (build + S3 sync + invalidate). The domain is still NOT public: no apex/www
+  # A-ALIAS records exist (go_live=false), so the language switcher keeps the
+  # same-domain fallback for Hebrew until go-live.
   - id: "il-he"
     domain: "crystolia.co.il"
     locale: "he"
     defaultLocale: "he"
-    status: "planned"
+    status: "provisioned"
     aws:
       bucket: "crystolia-landing-coil"
       cloudfront:
-        distributionId: null
+        distributionId: "E1J25KKR57SJJQ"
         aliases: ["crystolia.co.il", "www.crystolia.co.il"]
       route53:
         hostedZoneId: "Z00702083FKV46OHW88RZ"
