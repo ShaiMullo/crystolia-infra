@@ -64,12 +64,12 @@ markets:
     features:
       rootLocaleRewrite: false         # .com serves /en.html via custom_error_response
 
-  # ── crystolia.ru (Russian) — PROVISIONED, not yet public ──────────────────
+  # ── crystolia.ru (Russian) — LIVE ─────────────────────────────────────────
   - id: "ru-ru"
     domain: "crystolia.ru"
     locale: "ru"
     defaultLocale: "ru"
-    status: "provisioned"              # built (D4.1) with go_live=false; zone has NS+SOA only
+    status: "live"                     # D4.1 go_live=true applied; apex/www A-ALIAS public
     aws:
       bucket: "crystolia-landing-ru"
       cloudfront:
