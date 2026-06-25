@@ -82,7 +82,7 @@
         "robotsHost": "https://crystolia.ru",
         "sitemapHost": "https://crystolia.ru"
       },
-      "status": "provisioned"
+      "status": "live"
     },
     {
       "aws": {
